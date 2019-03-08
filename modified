@@ -1,0 +1,193 @@
+
+#include <opencv2/core/core.hpp>
+#include<opencv2/opencv.hpp>
+
+#include <opencv2/highgui/highgui.hpp>
+
+using namespace cv;
+/*
+标记求导过后的像素值正负
+imageX为x方向求导
+imageY为y方向求导
+imageXY为canny结果
+theta为梯度的角度图
+point为标记，x方向求导得到正值标记1，负值标记2
+*/
+void makepic(const Mat imageSource, Mat &imageX, Mat &imageY, Mat &gradXY, Mat &theta, Mat &point)
+{
+	
+	Sobel(imageSource, imageX, CV_16S, 1, 0, 3);
+	Sobel(imageSource, imageY, CV_16S, 0, 1, 3);
+
+	Canny(imageSource, gradXY, 70, 170);
+	theta = Mat::zeros(imageSource.size(), CV_32SC1);
+	point = Mat::zeros(imageSource.size(), CV_8UC1);
+	int rows = imageSource.rows;
+	int cols = imageSource.cols;
+	Mat_<int> imx = imageX; Mat_<int> imy = imageY;
+	Mat_<int> the = theta; Mat_<uchar> po = point; 
+
+	for (int i = 0; i < rows-1; i++)
+	{
+		for (int j = 0; j < cols-1; j++)
+		{
+			double grady = imy(i, j);
+			double gradx = imx(i, j);
+			
+			if (gradx< 0) {
+				po(i, j) = 101;
+			}
+			if (gradx > 0) {
+				po(i, j) = 255;
+			}
+			
+			the(i, j) = int(atan(grady / (gradx+ 0.000000000001))*57.3);
+			the(i, j) = int((the(i, j) + 360) % 360);
+			
+			
+			
+		}
+	}
+
+}
+/*
+输入canny图，梯度角度图，求导正负图
+角度搜索方向与canny一致，直接找有无，无权重
+*/
+void cannychange(const Mat imageInput, Mat &imageOutput, const Mat &theta, const Mat &point) {
+	imageOutput = imageInput.clone();
+	int cols = imageInput.cols;
+	int rows = imageInput.rows;
+	int num = 3;//阈值
+	Mat_<uchar> po = point; Mat_<int> direction = theta;
+	Mat_<uchar> pic_canny = imageOutput;
+	//bool bt = 0;
+	for (int i = num; i < rows - num; i++)
+	{
+		for (int j = num; j < cols - num; j++)
+		{
+			if (po(i, j) == 255 || po(i, j == 0)) continue;
+			if (po(i, j) == 101) {
+				if (0<=direction(i,j)<45 || 180 <= direction(i,j)<225)
+				{
+					if ((po(i - 1, j) != 255 || po(i - 2, j) != 255 || po(i - 3, j) != 255 || po(i + 1, j) != 255 || po(i + 2, j) != 255 || po(i + 3, j) != 255 || po(i + 4, j) != 255 || po(i -4, j) != 255)) {
+						pic_canny(i, j) = 0;
+					}
+					//for (int k = 0; k < num; k++) {
+					//	bt = bt ||(po(i - k, j) == 255)|| (po(i + k, j) == 255);
+				}
+					
+				}
+				if (45 <= direction(i, j)<90 || 255 <= direction(i, j)<270)
+				{
+					if ((po(i - 1, j+1) != 255 || po(i - 2, j+2) != 255 || po(i - 3, j+3) != 255 || po(i + 1, j-1) != 255 || po(i + 2, j-2) != 255 || po(i + 3, j-3) != 255) || po(i + 4, j-4) != 255 || po(i -4, j+4) != 255) {
+				 	pic_canny(i, j) = 0;
+					}
+					//for (int k = 0; k < num; k++) {
+				//		bt = bt || (po(i - k, j+k) == 255) || (po(i + k, j-k) == 255);
+					//}
+				}
+				if (90 <= direction(i, j)<135 || 270 <= direction(i, j)<315)
+				{
+					if ((po(i , j + 1) != 255 || po(i , j + 2) != 255 || po(i , j + 3) != 255 || po(i , j - 1) != 255 || po(i , j - 2) != 255 || po(i , j - 3) != 255 || po(i, j + 4) != 255 || po(i, j - 4) != 255)) {
+						pic_canny(i, j) = 0;
+					}
+				//	for (int k = 0; k < num; k++) {
+				//		bt = bt || (po(i , j+k) == 255) || (po(i , j-k) == 255);
+				//	}
+
+				}
+				if (135 <= direction(i, j)<180 || 315 <= direction(i, j)<360)
+				{
+					if ((po(i+1, j + 1) != 255 || po(i+2, j + 2) != 255 || po(i+3, j + 3) != 255 || po(i-1, j - 1) != 255 || po(i-2, j - 2) != 255 || po(i-3, j - 3) != 255 || po(i + 4, j + 4) != 255 || po(i - 4, j - 4) != 255)) {
+						pic_canny(i, j) = 0;
+					}
+					//for (int k = 0; k < num; k++) {
+					//	bt = bt || (po(i+k, j + k) == 255) || (po(i-k, j - k) == 255);
+					//}
+					
+				
+				}
+				//if (!bt) {
+				//	pic_canny(i, j) = 0;}
+			}
+		    
+		}
+	}
+
+/*
+
+num 为阈值缺省值为
+*/
+void cannychang_zuo(const Mat imageInput, Mat &imageOutput, const Mat &point, const int num = 70,const int min_num = 30) {
+	imageOutput = imageInput.clone();
+	int cols = imageInput.cols;
+	int rows = imageInput.rows;
+	//Mat_<uchar> po = point;
+	Mat_<uchar> pic_canny = imageOutput;
+	Mat_<uchar> picp = imageInput;
+	
+	for (int i = 0; i < rows ; i++)
+	{
+		for (int j = num; j < cols - num; j++)
+		{
+			bool bit = false;
+			if (pic_canny(i, j) == 0) continue;
+			if (pic_canny(i, j) == 255) {
+				for (int k = min_num; k <= num; k++) {
+					bit = (bit || bool(pic_canny(i, j+k) == 255));
+				}
+				//if (i % 5 == 0) std::cout << bit;
+					if (!bit) {
+						(pic_canny(i, j) = 0);
+						
+					}
+					
+				}
+			}
+		}
+	}
+
+
+
+
+int main()
+
+ {
+
+	Mat pic = imread("D:/11.bmp",0);
+	
+
+	if (pic.empty())
+	{
+		printf("can not load image \n");
+		return -1;
+	}
+	Mat pic_x,pic_y,pic_canny,theta,point,pic_canny_change,pic_canny_chang_zuo;
+	makepic(pic, pic_x, pic_y, pic_canny, theta, point);
+	cannychange(pic_canny, pic_canny_change, theta, point);
+	cannychang_zuo(pic_canny, pic_canny_chang_zuo, point);
+	
+
+
+
+
+	    //imshow("图片", pic);
+		//imshow("标记点", point);
+		imshow("canny", pic_canny);
+		imshow("canny_change", pic_canny_change);
+		imshow("canny_change_zuo", pic_canny_chang_zuo);
+		
+		//std::cout << pic_x;
+		//std::cout << theta;
+		imwrite("pic_canny.jpg", pic);
+		imwrite("pic_canny_chang_zuo.jpg", pic_canny_chang_zuo);
+		imwrite("pic_canny_chang.jpg", pic_canny_change);
+
+		
+		waitKey();
+	    
+
+	return 0;
+
+}
